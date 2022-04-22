@@ -65,7 +65,7 @@ function iostat_to_csv() {
     data_dir=$1
     if [[ ! -d ${data_dir} ]]; then return 1; fi
 
-    iostat_ver=`iostat -V | grep -i version | cut -d" " -f3 | cut -d\. -f1`
+    iostat_ver=`iostat -V | grep -m1 -i sysstat | cut -d" " -f3 | cut -d\. -f1`
     if [[ ${iostat_ver} -lt 11 ]]
     then
         iofields="4-9,14"
@@ -86,7 +86,7 @@ function iostat_to_csv() {
         grep -E "[0-9]+:[0-9]+:" ${fiostat} >> ${ts}
 
         grep -m1 Device ${fiostat} | sed -r "s/\s+/,/g" | cut -d, -f ${iofields} > ${io_out}
-        grep -e sfd -e nvme ${fiostat} | sed -r "s/\s+/,/g"  | cut -d, -f ${iofields} >> ${io_out}
+        grep -e nvme -e sd -e vd ${fiostat} | sed -r "s/\s+/,/g"  | cut -d, -f ${iofields} >> ${io_out}
 
         grep -m1 avg-cpu ${fiostat} | sed -r "s/\s+/,/g" | cut -d, -f ${cpufields} > ${cpu_out}
         grep -A1 avg-cpu ${fiostat} | grep -v \- | sed -r "s/\s+/,/g" | cut -d, -f ${cpufields} >> ${cpu_out}
@@ -117,7 +117,9 @@ function fio_to_csv() {
             echo "lat unit,min,max,avg,stdev" > ${lat_csv}
         fi
         grep -e pid= ${f} | sed -r -e "s/(randrw.*):.*\(.*/\1\n/g" -e "s/(.*):.*\(.*/\1/g" >> ${io_pattern}
-        grep -e BW= ${f} | sed -r -e "s/\s*(.*):\s*IOPS=([0-9\.k]+),\s*BW=([0-9\.]+MiB).*/\1,\2,\3/g" >> ${bw_iops_csv}
+        grep -e BW= ${f} | sed -r -e "s/\s*(.*):\s*IOPS=([0-9\.k]+),\s*BW=([0-9\.]+MiB).*/\1,\2,\3/g" \
+             -e "s/\s*(.*):\s*IOPS=([0-9\.]+),\s*BW=([0-9\.]+KiB).*/\1,\2,\3/g" \
+             >> ${bw_iops_csv}
         grep -e "\slat\s.*avg=" ${f} | sed -r -e "s/\s+(lat\s.*):\smin=\s*([0-9]+),\s+max=\s*([0-9]+),\s+avg=\s*([0-9\.]+),\sstdev=\s*([0-9\.]+).*/\1,\2,\3,\4,\5/g" >> ${lat_csv} 
 
     done
