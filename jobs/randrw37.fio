@@ -6,12 +6,12 @@ thread
 group_reporting
 name=baseline
 
-[randrw_4k_j8_qd32]
+[randrw37_4k_j8_qd32]
 stonewall
 size=100%
 bs=4k
 rw=randrw
-rwmixread=70
+rwmixread=30
 numjobs=8
 iodepth=32
 time_based

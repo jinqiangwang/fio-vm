@@ -8,16 +8,8 @@ function collect_nvme_info() {
     echo "`nvme intel smart-log-add /dev/${drv_name}`"
     echo ""
     echo "`grep . /sys/block/${drv_name}/queue/*`"
-}
-
-function collect_nvme_info() {
-    drv_name=$1
-    
-    echo "`nvme smart-log /dev/${drv_name}`"
-    echo ""
-    echo "`nvme intel smart-log-add /dev/${drv_name}`"
-    echo ""
-    echo "`grep . /sys/block/${drv_name}/queue/*`"
+    ch_dev=$(echo ${drv_name} | cut -d"n" -f 1-2)
+    echo "`grep ${ch_dev} /proc/interrupts | sed -r "s/\s+/,/g"`"
 }
 
 function collect_drv_info() {
@@ -107,6 +99,7 @@ function fio_to_csv() {
         disk_name=${f/*\/}; disk_name=${disk_name/_*}
         io_pattern=${data_dir}/${disk_name}_io_pattern.csv
         bw_iops_csv=${data_dir}/${disk_name}_bw_iops.csv
+        clat_percentile=${data_dir}/${disk_name}_per_lat.csv
         lat_csv=${data_dir}/${disk_name}_lat.csv
         report=${data_dir}/${disk_name}_summary.csv
         if [[ ${header} -eq 0 ]]
@@ -115,6 +108,7 @@ function fio_to_csv() {
             echo "pattern" > ${io_pattern}
             echo "I/O,KIOPS,BW (MiB/s)" > ${bw_iops_csv}
             echo "lat unit,min,max,avg,stdev" > ${lat_csv}
+            echo "clat unit,90th,99th,99.9th,99.99th,99.999th" > ${clat_percentile}
         fi
         grep -e pid= ${f} | sed -r -e "s/(randrw.*):.*\(.*/\1\n/g" -e "s/(.*):.*\(.*/\1/g" >> ${io_pattern}
         grep -e BW= ${f} | sed -r -e "s/\s*(.*):\s*IOPS=([0-9\.k]+),\s*BW=([0-9\.]+MiB).*/\1,\2,\3/g" \
@@ -122,9 +116,25 @@ function fio_to_csv() {
              >> ${bw_iops_csv}
         grep -e "\slat\s.*avg=" ${f} | sed -r -e "s/\s+(lat\s.*):\smin=\s*([0-9]+),\s+max=\s*([0-9]+),\s+avg=\s*([0-9\.]+),\sstdev=\s*([0-9\.]+).*/\1,\2,\3,\4,\5/g" >> ${lat_csv} 
 
+        # extract clat tail latencies
+        tail_lats=("90.000th=" "99.000th=" "99.900th=" "99.990th=" "99.999th=")
+        grep percentiles ${f} | sed -r "s/.*\(([a-z]+)\).*/\1/g" > ${clat_percentile}.tmp3
+        for tail_lat in ${tail_lats[@]}
+        do
+            grep ${tail_lat} ${f} | sed -r -e "s/.*${tail_lat}\[\s*([0-9]+)\].*/\1/g" > ${clat_percentile}.tmp1
+            if [ -e ${clat_percentile}.tmp3 ]
+            then 
+                paste -d, ${clat_percentile}.tmp3 ${clat_percentile}.tmp1 > ${clat_percentile}.tmp2
+                mv -f ${clat_percentile}.tmp2 ${clat_percentile}.tmp3 
+            else
+                mv -f ${clat_percentile}.tmp1 ${clat_percentile}.tmp3
+            fi
+        done
+        cat ${clat_percentile}.tmp3 >> ${clat_percentile}
+        rm -f ${clat_percentile}.tmp*
     done
-    paste -d, ${io_pattern} ${bw_iops_csv} ${lat_csv} > ${report}
-    rm -f ${io_pattern} ${bw_iops_csv} ${lat_csv}
+    paste -d, ${io_pattern} ${bw_iops_csv} ${lat_csv} ${clat_percentile} > ${report}
+    rm -f ${io_pattern} ${bw_iops_csv} ${lat_csv} ${clat_percentile} 
 }
 
 function consolidate_summary() {

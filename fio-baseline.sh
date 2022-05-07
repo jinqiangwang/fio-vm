@@ -3,24 +3,18 @@
 my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 # put device name here to run fio test for 
 # multiple disks in parallel
-# example disks=(nvme0n1 nvme1n1 nvme0n1 nvme1n1)
+# example disks=(nvme0n1 nvme1n1 nvme2n1 nvme3n1)
 disks=(nvme0n1)
-
-# #another example to run test for even more disks
-# #
-# disk=""
-# dev_prefix=nvme
-# for i in {0..12}
-# do
-#     disks="${disks} ${dev_prefix}${i}n1"
-# done
-#
 
 # fio workloads
 workloads=( \
-    precond_rand \
+    precond_seq.fio \
+    seqwrite \
+    seqread \
     randwrite \
-    randrw \
+    randrw73 \
+    randrw55 \
+    randrw37 \
     randread \
     )
 
