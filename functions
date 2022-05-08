@@ -9,7 +9,9 @@ function collect_nvme_info() {
     echo ""
     echo "`grep . /sys/block/${drv_name}/queue/*`"
     ch_dev=$(echo ${drv_name} | cut -d"n" -f 1-2)
+    echo ""
     echo "`grep ${ch_dev} /proc/interrupts | sed -r "s/\s+/,/g"`"
+    echo ""
 }
 
 function collect_drv_info() {
@@ -20,11 +22,6 @@ function collect_drv_info() {
         if [[ `echo ${drv_name} | grep /dev/` ]]
         then
             drv_name=${drv_name#/dev/}
-        fi
-
-        if [[ "${drv_name::4}" == "nvme" ]]
-        then
-            collect_nvme_info ${drv_name}
         fi
 
         if [[ "${drv_name::4}" == "nvme" ]]
