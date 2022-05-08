@@ -8,7 +8,7 @@ disks=(nvme0n1)
 
 # fio workloads
 workloads=( \
-    precond_seq.fio \
+    precond_seq \
     seqwrite \
     seqread \
     randwrite \
