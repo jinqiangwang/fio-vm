@@ -22,7 +22,7 @@ workloads=( \
 # they does not affect the time used for pre-condition
 # workloads, like precond_seq and precond_rand
 export ramp_time=${ramp_time-60}
-export runtime=${runtime-1800}
+export runtime=${runtime-1200}
 
 timestamp=`date +%Y%m%d_%H%M%S`
 output_dir=${my_dir}/${timestamp}

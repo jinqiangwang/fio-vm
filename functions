@@ -32,7 +32,9 @@ function collect_drv_info() {
 }
 
 function collect_sys_info() {
-    echo -e "[memory]"
+    echo -e "\n[nvme lis]"
+    echo "`nvme list`"
+    echo -e "\n[memory]"
     echo "`free -m`"
     echo -e "\n[lsblk]"
     echo "`lsblk`"
