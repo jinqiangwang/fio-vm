@@ -4,7 +4,16 @@ my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 # put device name here to run fio test for 
 # multiple disks in parallel
 # example disks=(nvme0n1 nvme1n1 nvme2n1 nvme3n1)
+
+# replace actual disk names in blow line to start test 
+# this is to avoid wiping out data on nvme0n1 accidentally 
 disks=(<disk_name>)
+
+if [ "${disks[@]}" == "<disk_name>" ]
+then
+    echo "please change this line [disks=(<disk_name>)] to the disks going to be tested"
+    exit 1
+fi
 
 # fio workloads
 workloads=( \
