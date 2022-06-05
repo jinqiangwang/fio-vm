@@ -4,7 +4,7 @@ my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 # put device name here to run fio test for 
 # multiple disks in parallel
 # example disks=(nvme0n1 nvme1n1 nvme2n1 nvme3n1)
-disks=(<nvme0n1>)
+disks=(<disk_name>)
 
 # fio workloads
 workloads=( \
