@@ -1,5 +1,16 @@
 #/bin/bash -x
 
+function trap_ctrlc() {
+    kill -9 ${thermal_pid_list}
+    echo -e "\nkill thermal collection [${thermal_pid_list}] =$? (0 = success)"
+    kill -9 ${iostat_pid_list}
+    echo    "kill iostat [${iostat_pid_list}[] =$? (0 = success)"
+    kill -9 ${fio_pid_list}
+    echo    "kill fio [${fio_pid_list}] =$? (0 = success)"
+    exit 1
+}
+trap trap_ctrlc INT
+
 function collect_nvme_info() {
     drv_name=$1
     
@@ -32,7 +43,7 @@ function collect_drv_info() {
 }
 
 function collect_sys_info() {
-    echo -e "\n[nvme lis]"
+    echo -e "\n[nvme list]"
     echo "`nvme list`"
     echo -e "\n[memory]"
     echo "`free -m`"
@@ -96,6 +107,7 @@ function fio_to_csv() {
     for f in `ls -tr ${data_dir}/${disk}*.fio`
     do
         disk_name=${f/*\/}; disk_name=${disk_name/_*}
+        job_name=${data_dir}/${disk_name}_job_name.csv
         io_pattern=${data_dir}/${disk_name}_io_pattern.csv
         bw_iops_csv=${data_dir}/${disk_name}_bw_iops.csv
         clat_percentile=${data_dir}/${disk_name}_per_lat.csv
@@ -104,23 +116,27 @@ function fio_to_csv() {
         if [[ ${header} -eq 0 ]]
         then
             header=1
+            echo "job name" > ${job_name}
             echo "pattern" > ${io_pattern}
             echo "I/O,KIOPS,BW (MiB/s)" > ${bw_iops_csv}
             echo "lat unit,min,max,avg,stdev" > ${lat_csv}
-            echo "clat unit,90th,99th,99.9th,99.99th,99.999th" > ${clat_percentile}
+            echo "clat unit,90th,99th,99.9th,99.99th,99.999th,99.9999th,99.99999th,99.999999th" > ${clat_percentile}
         fi
-        grep -e pid= ${f} | sed -r -e "s/(randrw.*):.*\(.*/\1\n/g" -e "s/(.*):.*\(.*/\1/g" >> ${io_pattern}
+        
+        grep -e rw= ${f} | sed -r -e "s/(.*):\s\(.*/\1/g" >> ${job_name}
+        if [ ! -z "`grep rw=randrw ${f}`" ]; then echo >> ${job_name}; fi
+        grep -e rw= ${f} | sed -r -e "s/.*rw=(randrw),.*/\1\n/g" -e "s/.*rw=([a-z]+),.*/\1/g" >> ${io_pattern}
         grep -e BW= ${f} | sed -r -e "s/\s*(.*):\s*IOPS=([0-9\.k]+),\s*BW=([0-9\.]+MiB).*/\1,\2,\3/g" \
              -e "s/\s*(.*):\s*IOPS=([0-9\.]+),\s*BW=([0-9\.]+KiB).*/\1,\2,\3/g" \
              >> ${bw_iops_csv}
-        grep -e "\slat\s.*avg=" ${f} | sed -r -e "s/\s+(lat\s.*):\smin=\s*([0-9]+),\s+max=\s*([0-9]+),\s+avg=\s*([0-9\.]+),\sstdev=\s*([0-9\.]+).*/\1,\2,\3,\4,\5/g" >> ${lat_csv} 
+        grep -e "\slat\s.*avg=" ${f} | sed -r -e "s/^\s+lat\s*\(([a-z]+)\)\s*:\s*min=\s*([0-9]+),\s+max=\s*([0-9]+),\s+avg=\s*([0-9\.]+),\sstdev=\s*([0-9\.]+).*/\1,\2,\3,\4,\5/g" >> ${lat_csv} 
 
         # extract clat tail latencies
-        tail_lats=("90.000th=" "99.000th=" "99.900th=" "99.990th=" "99.999th=")
+        tail_lats=("90.0{6}th=" "99.0{6}th=" "99.90{5}th=" "99.9{2}0{4}th=" "99.9{3}0{3}th=" "99.9{4}0{2}th=" "99.9{5}0th=" "99.9{6}th=")
         grep percentiles ${f} | sed -r "s/.*\(([a-z]+)\).*/\1/g" > ${clat_percentile}.tmp3
         for tail_lat in ${tail_lats[@]}
         do
-            grep ${tail_lat} ${f} | sed -r -e "s/.*${tail_lat}\[\s*([0-9]+)\].*/\1/g" > ${clat_percentile}.tmp1
+            grep -E ${tail_lat} ${f} | sed -r -e "s/.*${tail_lat}\[\s*([0-9]+)\].*/\1/g" > ${clat_percentile}.tmp1
             if [ -e ${clat_percentile}.tmp3 ]
             then 
                 paste -d, ${clat_percentile}.tmp3 ${clat_percentile}.tmp1 > ${clat_percentile}.tmp2
@@ -132,8 +148,8 @@ function fio_to_csv() {
         cat ${clat_percentile}.tmp3 >> ${clat_percentile}
         rm -f ${clat_percentile}.tmp*
     done
-    paste -d, ${io_pattern} ${bw_iops_csv} ${lat_csv} ${clat_percentile} > ${report}
-    rm -f ${io_pattern} ${bw_iops_csv} ${lat_csv} ${clat_percentile} 
+    paste -d, ${job_name} ${io_pattern} ${bw_iops_csv} ${lat_csv} ${clat_percentile} > ${report}
+    rm -f ${job_name} ${io_pattern} ${bw_iops_csv} ${lat_csv} ${clat_percentile} 
 }
 
 function consolidate_summary() {
@@ -152,21 +168,35 @@ function consolidate_summary() {
         if [[ ${header_collcted} -eq 0 ]]
         then
             header_collcted=1
-            header_txt=`cat $f | cut -d, -f1,2`
+            header_txt=`cat $f | cut -d, -f1-3`
             echo "KIOPS"          > ${headers}
             echo "${header_txt}" >> ${headers}
             echo ""              >> ${headers}
             echo "BW (MiB/s)"    >> ${headers}
             echo "${header_txt}" >> ${headers}
+            echo ""              >> ${headers}
+            echo "avg lat"       >> ${headers}
+            echo "${header_txt}" >> ${headers}
+            echo ""              >> ${headers}
+            echo "99.9th clat"   >> ${headers}
+            echo "${header_txt}" >> ${headers}
         fi
 
         echo "" > ${result}
         echo ${disk_name} >> ${result}
-        cat $f | grep -v IOPS | cut -d, -f 3 >> ${result}
+        cat $f | grep -v IOPS | cut -d, -f 4 >> ${result}
         echo "" >> ${result}
         echo "" >> ${result}
         echo ${disk_name} >> ${result}
-        cat $f | grep -v BW   | cut -d, -f 4 >> ${result}
+        cat $f | grep -v BW   | cut -d, -f 5 >> ${result}
+        echo "" >> ${result}
+        echo "" >> ${result}
+        echo ${disk_name}, >> ${result}
+        cat $f | grep -v BW   | cut -d, -f 6,9 >> ${result}
+        echo "" >> ${result}
+        echo "" >> ${result}
+        echo ${disk_name}, >> ${result}
+        cat $f | grep -v BW   | cut -d, -f 11,14 >> ${result}
 
         result_list="${result_list} ${result}"
     done
@@ -179,4 +209,27 @@ function collect_temperature() {
     dev_name=$1
 
     echo `nvme smart-log ${dev_name} | grep -e nvme -e temperature | sed -r -e "s/.*:(nvme[0-9]+n1).*/\1/g" -e "s/.*: ([0-9]+) C.*/\1/g"` | sed -r "s/\s+/,/g"
+}
+
+function calculate_wa() {
+    data_dir=$1
+    disk=$2
+    workload=$3
+
+    prefix=${data_dir}/${disk}_${workload}
+
+    host_bytes_written_1=$(grep host_bytes_written ${prefix}_1.info | sed -r -e "s/://g" -e "s/\s+/,/g" | cut -d, -f 4)
+    nand_bytes_written_1=$(grep nand_bytes_written ${prefix}_1.info | sed -r -e "s/://g" -e "s/\s+/,/g" | cut -d, -f 4)
+    host_bytes_written_2=$(grep host_bytes_written ${prefix}_2.info | sed -r -e "s/://g" -e "s/\s+/,/g" | cut -d, -f 4)
+    nand_bytes_written_2=$(grep nand_bytes_written ${prefix}_2.info | sed -r -e "s/://g" -e "s/\s+/,/g" | cut -d, -f 4)
+
+    host_written=$((${host_bytes_written_2}-${host_bytes_written_1}))
+    nand_written=$((${nand_bytes_written_2}-${nand_bytes_written_1}))
+
+    if [ ${host_written} -gt 0 ]
+    then
+        echo "${disk},${workload},${host_written},${nand_written},"$(awk -v n=${nand_written} -v h=${host_written} 'BEGIN { printf("%.2f", n/h) }')
+    else
+        echo "${disk},${workload},${host_written},${nand_written},""N/A"
+    fi
 }

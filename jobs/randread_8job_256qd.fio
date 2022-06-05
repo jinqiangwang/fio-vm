@@ -6,13 +6,13 @@ thread
 group_reporting
 name=baseline
 
-[randread_4k_j8_qd32]
+[randread_4k_j8_qd256]
 stonewall
 size=100%
 bs=4k
 rw=randread
 numjobs=8
-iodepth=32
+iodepth=256
 time_based
 ramp_time=${ramp_time}
 runtime=${runtime}

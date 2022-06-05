@@ -1,5 +1,5 @@
 [global]
-percentile_list=1:5:10:25:50:75:90:95:95.5:96:96.5:97:97.5:98:98.5:99:99.5:99.9:99.99:99.999
+percentile_list=1:5:10:25:50:75:90:95:99:99.5:99.9:99.99:99.999:99.9999:99.99999:99.999999
 ioengine=libaio
 direct=1
 thread
@@ -15,5 +15,5 @@ rwmixread=0
 numjobs=8
 iodepth=32
 time_based
-ramp_time=${ramp_time}
+ramp_time=${ramp_time_randwrite}
 runtime=${runtime}
