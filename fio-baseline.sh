@@ -7,11 +7,12 @@ my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 
 # replace actual disk names in blow line to start test 
 # this is to avoid wiping out data on nvme0n1 accidentally 
-disks=(<disk_name>)
+# disks=(nvme0n1 nvme1n1)
+disks=(disk_name)
 
-if [ "${disks[@]}" == "<disk_name>" ]
+if [ '${disks[@]}' == 'disk_name' ]
 then
-    echo "please change this line [disks=(<disk_name>)] to the disks going to be tested"
+    echo "please change this line [disks=(disk_name)] to the disks being tested"
     exit 1
 fi
 
@@ -25,15 +26,15 @@ workloads=( \
     randrw55 \
     randrw37 \
     randread \
-    randread_8job_256qd \
+    # randread_8job_256qd \
     )
 
 # below numbers controls the fio workload run time.
 # they does not affect the time used for pre-condition
 # workloads, like precond_seq and precond_rand
 export ramp_time=${ramp_time-60}
-export ramp_time_randwrite=${ramp_time_randwrite-600}
-export runtime=${runtime-1200}
+export ramp_time_randwrite=${ramp_time_randwrite-60}
+export runtime=${runtime-600}
 
 timestamp=`date +%Y%m%d_%H%M%S`
 output_dir=${my_dir}/${timestamp}
@@ -64,7 +65,7 @@ do
         collect_drv_info ${disk} > ${drvinfo_dir}/${disk}_${workload}_1.info
         iostat -dxmct 1 ${disk} > ${iostat_dir}/${disk}_${workload}.iostat &
         iostat_pid_list="${iostat_pid_list} $!"
-        ${my_dir}/record_thermal.sh /dev/${disk} ${thermal_dir}/${disk}_${workload}.thermal &
+        ${my_dir}/record_temp.sh /dev/${disk} ${thermal_dir}/${disk}_${workload}.thermal &
         thermal_pid_list="${thermal_pid_list} $!"
 
         fio --filename=/dev/${disk} \
