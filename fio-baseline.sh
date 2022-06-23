@@ -1,5 +1,6 @@
 #!/bin/bash
 
+fio_cmd=fio
 my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 # put device name here to run fio test for 
 # multiple disks in parallel
@@ -8,7 +9,7 @@ my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 # replace actual disk names in blow line to start test 
 # this is to avoid wiping out data on nvme0n1 accidentally 
 # disks=(nvme0n1 nvme1n1)
-disks=(disk_name)
+disks=($1)
 
 if [ '${disks[@]}' == 'disk_name' ]
 then
@@ -26,8 +27,11 @@ workloads=( \
     randrw55 \
     randrw37 \
     randread \
-    # randread_8job_256qd \
+    randread_8job_256qd \
     )
+
+which ${fio_cmd} > /dev/null 2>&1
+if [ $? -ne 0 ]; then echo "not able to locate fio command, please define \"fio_cmd\" pointing to fio path in this script"; exit 1; fi
 
 # below numbers controls the fio workload run time.
 # they does not affect the time used for pre-condition

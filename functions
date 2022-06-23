@@ -106,6 +106,7 @@ function fio_to_csv() {
     header=0
     for f in `ls -tr ${data_dir}/${disk}*.fio`
     do
+        rw_job=0
         disk_name=${f/*\/}; disk_name=${disk_name/_*}
         job_name=${data_dir}/${disk_name}_job_name.csv
         io_pattern=${data_dir}/${disk_name}_io_pattern.csv
@@ -124,8 +125,19 @@ function fio_to_csv() {
         fi
         
         grep -e rw= ${f} | sed -r -e "s/(.*):\s\(.*/\1/g" >> ${job_name}
-        if [ ! -z "`grep rw=randrw ${f}`" ]; then echo >> ${job_name}; fi
-        grep -e rw= ${f} | sed -r -e "s/.*rw=(randrw),.*/\1\n/g" -e "s/.*rw=([a-z]+),.*/\1/g" >> ${io_pattern}
+        if [[ ! -z "`grep rw=randrw ${f}`" ]] && [[ ! -z "`grep read: ${f}`" ]] && [[ ! -z "`grep write: ${f}`" ]]
+        then
+            echo >> ${job_name}
+            rw_job=1
+        fi
+        if [[ ! -z "`grep rw=rw ${f}`" ]] && [[ ! -z "`grep read: ${f}`" ]] && [[ ! -z "`grep write: ${f}`" ]]
+        then
+            echo >> ${job_name}
+            rw_job=1
+        fi
+        grep -e rw= ${f} | sed -r "s/.*rw=([a-z]+),.*/\1/g" >> ${io_pattern}
+        if [ ${rw_job} -eq 1 ]; then echo >> ${io_pattern}; fi
+
         grep -e BW= ${f} | sed -r -e "s/\s*(.*):\s*IOPS=([0-9\.k]+),\s*BW=([0-9\.]+MiB).*/\1,\2,\3/g" \
              -e "s/\s*(.*):\s*IOPS=([0-9\.]+),\s*BW=([0-9\.]+KiB).*/\1,\2,\3/g" \
              >> ${bw_iops_csv}
