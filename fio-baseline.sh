@@ -9,7 +9,13 @@ my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 # replace actual disk names in blow line to start test 
 # this is to avoid wiping out data on nvme0n1 accidentally 
 # disks=(nvme0n1 nvme1n1)
-disks=($1)
+disks=($@)
+
+if [ ${#disks[@]} -eq 0 ]
+then
+    echo -e "usage:\n  单盘测试: $0 nvme0n1\n  多盘测试: $0 nvme0n1 nvme1n1 nvme2n1"
+    exit
+fi
 
 if [ '${disks[@]}' == 'disk_name' ]
 then
